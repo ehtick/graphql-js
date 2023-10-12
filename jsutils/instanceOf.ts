@@ -8,7 +8,7 @@ import { inspect } from './inspect.ts';
 export const instanceOf: (value: unknown, constructor: Constructor) => boolean =
   /* c8 ignore next 6 */
   // FIXME: https://github.com/graphql/graphql-js/issues/2317
-  globalThis.process?.env.NODE_ENV === 'production'
+  globalThis.process != null && globalThis.process.env.NODE_ENV === 'production'
     ? function instanceOf(value: unknown, constructor: Constructor): boolean {
         return value instanceof constructor;
       }
@@ -22,8 +22,7 @@ export const instanceOf: (value: unknown, constructor: Constructor) => boolean =
           const valueClassName =
             // We still need to support constructor's name to detect conflicts with older versions of this library.
             Symbol.toStringTag in value
-              ? // @ts-expect-error TS bug see, https://github.com/microsoft/TypeScript/issues/38009
-                value[Symbol.toStringTag]
+              ? value[Symbol.toStringTag]
               : value.constructor?.name;
           if (className === valueClassName) {
             const stringifiedValue = inspect(value);

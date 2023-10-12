@@ -1,3 +1,6 @@
+import { AccumulatorMap } from '../jsutils/AccumulatorMap.ts';
+import { capitalize } from '../jsutils/capitalize.ts';
+import { andList } from '../jsutils/formatList.ts';
 import { inspect } from '../jsutils/inspect.ts';
 import type { Maybe } from '../jsutils/Maybe.ts';
 import { GraphQLError } from '../error/GraphQLError.ts';
@@ -98,35 +101,41 @@ class SchemaValidationContext {
 }
 function validateRootTypes(context: SchemaValidationContext): void {
   const schema = context.schema;
-  const queryType = schema.getQueryType();
-  if (!queryType) {
+  if (schema.getQueryType() == null) {
     context.reportError('Query root type must be provided.', schema.astNode);
-  } else if (!isObjectType(queryType)) {
-    context.reportError(
-      `Query root type must be Object type, it cannot be ${inspect(
-        queryType,
-      )}.`,
-      getOperationTypeNode(schema, OperationTypeNode.QUERY) ??
-        (queryType as any).astNode,
-    );
   }
-  const mutationType = schema.getMutationType();
-  if (mutationType && !isObjectType(mutationType)) {
-    context.reportError(
-      'Mutation root type must be Object type if provided, it cannot be ' +
-        `${inspect(mutationType)}.`,
-      getOperationTypeNode(schema, OperationTypeNode.MUTATION) ??
-        (mutationType as any).astNode,
-    );
+  const rootTypesMap = new AccumulatorMap<
+    GraphQLObjectType,
+    OperationTypeNode
+  >();
+  for (const operationType of Object.values(OperationTypeNode)) {
+    const rootType = schema.getRootType(operationType);
+    if (rootType != null) {
+      if (!isObjectType(rootType)) {
+        const operationTypeStr = capitalize(operationType);
+        const rootTypeStr = inspect(rootType);
+        context.reportError(
+          operationType === OperationTypeNode.QUERY
+            ? `${operationTypeStr} root type must be Object type, it cannot be ${rootTypeStr}.`
+            : `${operationTypeStr} root type must be Object type if provided, it cannot be ${rootTypeStr}.`,
+          getOperationTypeNode(schema, operationType) ??
+            (rootType as any).astNode,
+        );
+      } else {
+        rootTypesMap.add(rootType, operationType);
+      }
+    }
   }
-  const subscriptionType = schema.getSubscriptionType();
-  if (subscriptionType && !isObjectType(subscriptionType)) {
-    context.reportError(
-      'Subscription root type must be Object type if provided, it cannot be ' +
-        `${inspect(subscriptionType)}.`,
-      getOperationTypeNode(schema, OperationTypeNode.SUBSCRIPTION) ??
-        (subscriptionType as any).astNode,
-    );
+  for (const [rootType, operationTypes] of rootTypesMap) {
+    if (operationTypes.length > 1) {
+      const operationList = andList(operationTypes);
+      context.reportError(
+        `All root types must be different, "${rootType.name}" type is used as ${operationList} root types.`,
+        operationTypes.map((operationType) =>
+          getOperationTypeNode(schema, operationType),
+        ),
+      );
+    }
   }
 }
 function getOperationTypeNode(
@@ -279,7 +288,7 @@ function validateInterfaces(
   context: SchemaValidationContext,
   type: GraphQLObjectType | GraphQLInterfaceType,
 ): void {
-  const ifaceTypeNames = Object.create(null);
+  const ifaceTypeNames = new Set<string>();
   for (const iface of type.getInterfaces()) {
     if (!isInterfaceType(iface)) {
       context.reportError(
@@ -296,14 +305,14 @@ function validateInterfaces(
       );
       continue;
     }
-    if (ifaceTypeNames[iface.name]) {
+    if (ifaceTypeNames.has(iface.name)) {
       context.reportError(
         `Type ${type.name} can only implement ${iface.name} once.`,
         getAllImplementsInterfaceNodes(type, iface),
       );
       continue;
     }
-    ifaceTypeNames[iface.name] = true;
+    ifaceTypeNames.add(iface.name);
     validateTypeImplementsAncestors(context, type, iface);
     validateTypeImplementsInterface(context, type, iface);
   }
@@ -319,7 +328,7 @@ function validateTypeImplementsInterface(
     const fieldName = ifaceField.name;
     const typeField = typeFieldMap[fieldName];
     // Assert interface field exists on type.
-    if (!typeField) {
+    if (typeField == null) {
       context.reportError(
         `Interface field ${iface.name}.${fieldName} expected but ${type.name} does not provide it.`,
         [ifaceField.astNode, type.astNode, ...type.extensionASTNodes],
@@ -406,16 +415,16 @@ function validateUnionMembers(
       [union.astNode, ...union.extensionASTNodes],
     );
   }
-  const includedTypeNames = Object.create(null);
+  const includedTypeNames = new Set<string>();
   for (const memberType of memberTypes) {
-    if (includedTypeNames[memberType.name]) {
+    if (includedTypeNames.has(memberType.name)) {
       context.reportError(
         `Union type ${union.name} can only include type ${memberType.name} once.`,
         getUnionMemberTypeNodes(union, memberType.name),
       );
       continue;
     }
-    includedTypeNames[memberType.name] = true;
+    includedTypeNames.add(memberType.name);
     if (!isObjectType(memberType)) {
       context.reportError(
         `Union type ${union.name} can only include Object types, ` +
@@ -470,6 +479,27 @@ function validateInputFields(
         [getDeprecatedDirectiveNode(field.astNode), field.astNode?.type],
       );
     }
+    if (inputObj.isOneOf) {
+      validateOneOfInputObjectField(inputObj, field, context);
+    }
+  }
+}
+function validateOneOfInputObjectField(
+  type: GraphQLInputObjectType,
+  field: GraphQLInputField,
+  context: SchemaValidationContext,
+): void {
+  if (isNonNullType(field.type)) {
+    context.reportError(
+      `OneOf input field ${type.name}.${field.name} must be nullable.`,
+      field.astNode?.type,
+    );
+  }
+  if (field.defaultValue !== undefined) {
+    context.reportError(
+      `OneOf input field ${type.name}.${field.name} cannot have a default value.`,
+      field.astNode,
+    );
   }
 }
 function createInputObjectCircularRefsValidator(
@@ -478,7 +508,7 @@ function createInputObjectCircularRefsValidator(
   // Modified copy of algorithm from 'src/validation/rules/NoFragmentCycles.js'.
   // Tracks already visited types to maintain O(N) and to ensure that cycles
   // are not redundantly reported.
-  const visitedTypes = Object.create(null);
+  const visitedTypes = new Set<GraphQLInputObjectType>();
   // Array of types nodes used to produce meaningful errors
   const fieldPath: Array<GraphQLInputField> = [];
   // Position in the type path
@@ -488,10 +518,10 @@ function createInputObjectCircularRefsValidator(
   // It does not terminate when a cycle was found but continues to explore
   // the graph to find all possible cycles.
   function detectCycleRecursive(inputObj: GraphQLInputObjectType): void {
-    if (visitedTypes[inputObj.name]) {
+    if (visitedTypes.has(inputObj)) {
       return;
     }
-    visitedTypes[inputObj.name] = true;
+    visitedTypes.add(inputObj);
     fieldPathIndexByTypeName[inputObj.name] = fieldPath.length;
     const fields = Object.values(inputObj.getFields());
     for (const field of fields) {
@@ -534,7 +564,7 @@ function getAllImplementsInterfaceNodes(
 function getUnionMemberTypeNodes(
   union: GraphQLUnionType,
   typeName: string,
-): Maybe<ReadonlyArray<NamedTypeNode>> {
+): ReadonlyArray<NamedTypeNode> {
   const { astNode, extensionASTNodes } = union;
   const nodes: ReadonlyArray<UnionTypeDefinitionNode | UnionTypeExtensionNode> =
     astNode != null ? [astNode, ...extensionASTNodes] : extensionASTNodes;
@@ -545,7 +575,7 @@ function getUnionMemberTypeNodes(
 }
 function getDeprecatedDirectiveNode(
   definitionNode: Maybe<{
-    readonly directives?: ReadonlyArray<DirectiveNode>;
+    readonly directives?: ReadonlyArray<DirectiveNode> | undefined;
   }>,
 ): Maybe<DirectiveNode> {
   return definitionNode?.directives?.find(

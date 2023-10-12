@@ -59,8 +59,11 @@ export {
   specifiedDirectives,
   GraphQLIncludeDirective,
   GraphQLSkipDirective,
+  GraphQLDeferDirective,
+  GraphQLStreamDirective,
   GraphQLDeprecatedDirective,
   GraphQLSpecifiedByDirective,
+  GraphQLOneOfDirective,
   // "Enum" of Type Kinds
   TypeKind,
   // Constant Deprecation Reason
@@ -143,6 +146,8 @@ export type {
   GraphQLAbstractType,
   GraphQLWrappingType,
   GraphQLNullableType,
+  GraphQLNullableInputType,
+  GraphQLNullableOutputType,
   GraphQLNamedType,
   GraphQLNamedInputType,
   GraphQLNamedOutputType,
@@ -214,7 +219,6 @@ export {
   // Visit
   visit,
   visitInParallel,
-  getVisitFn,
   getEnterLeaveForKind,
   BREAK,
   Kind,
@@ -223,6 +227,7 @@ export {
   isDefinitionNode,
   isExecutableDefinitionNode,
   isSelectionNode,
+  isNullabilityAssertionNode,
   isValueNode,
   isConstValueNode,
   isTypeNode,
@@ -234,9 +239,6 @@ export {
 export type {
   ParseOptions,
   SourceLocation,
-  TokenKindEnum,
-  KindEnum,
-  DirectiveLocationEnum,
   // Visitor utilities
   ASTVisitor,
   ASTVisitFn,
@@ -256,6 +258,10 @@ export type {
   SelectionNode,
   FieldNode,
   ArgumentNode,
+  NullabilityAssertionNode,
+  NonNullAssertionNode,
+  ErrorBoundaryNode,
+  ListNullabilityOperatorNode,
   ConstArgumentNode,
   FragmentSpreadNode,
   InlineFragmentNode,
@@ -307,6 +313,7 @@ export type {
 // Execute GraphQL queries.
 export {
   execute,
+  experimentalExecuteIncrementally,
   executeSync,
   defaultFieldResolver,
   defaultTypeResolver,
@@ -320,9 +327,19 @@ export {
 export type {
   ExecutionArgs,
   ExecutionResult,
+  ExperimentalIncrementalExecutionResults,
+  InitialIncrementalExecutionResult,
+  SubsequentIncrementalExecutionResult,
+  IncrementalDeferResult,
+  IncrementalStreamResult,
+  IncrementalResult,
   FormattedExecutionResult,
+  FormattedInitialIncrementalExecutionResult,
+  FormattedSubsequentIncrementalExecutionResult,
+  FormattedIncrementalDeferResult,
+  FormattedIncrementalStreamResult,
+  FormattedIncrementalResult,
 } from './execution/index.ts';
-export type { SubscriptionArgs } from './subscription/index.ts';
 // Validate GraphQL documents.
 export {
   validate,
@@ -371,13 +388,7 @@ export {
 } from './validation/index.ts';
 export type { ValidationRule } from './validation/index.ts';
 // Create, format, and print GraphQL errors.
-export {
-  GraphQLError,
-  syntaxError,
-  locatedError,
-  printError,
-  formatError,
-} from './error/index.ts';
+export { GraphQLError, syntaxError, locatedError } from './error/index.ts';
 export type {
   GraphQLErrorOptions,
   GraphQLFormattedError,
@@ -390,8 +401,6 @@ export {
   getIntrospectionQuery,
   // Gets the target Operation from a Document.
   getOperationAST,
-  // Gets the Type for the target Operation AST.
-  getOperationRootType,
   // Convert a GraphQLSchema to an IntrospectionQuery.
   introspectionFromSchema,
   // Build a GraphQLSchema from an introspection result.
@@ -408,6 +417,8 @@ export {
   printSchema,
   // Print a GraphQLType to GraphQL Schema language.
   printType,
+  // Print a GraphQLDirective to GraphQL Schema language.
+  printDirective,
   // Prints the built-in introspection schema in the Schema Language format.
   printIntrospectionSchema,
   // Create a GraphQLType from a GraphQL language AST.
@@ -433,10 +444,6 @@ export {
   isEqualType,
   isTypeSubTypeOf,
   doTypesOverlap,
-  // Asserts a string is a valid GraphQL name.
-  assertValidName,
-  // Determine if a string is a valid GraphQL name.
-  isValidNameError,
   // Compares two GraphQLSchemas and detects breaking changes.
   BreakingChangeType,
   DangerousChangeType,

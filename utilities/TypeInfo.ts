@@ -21,17 +21,11 @@ import {
   isEnumType,
   isInputObjectType,
   isInputType,
-  isInterfaceType,
   isListType,
   isObjectType,
   isOutputType,
 } from '../type/definition.ts';
 import type { GraphQLDirective } from '../type/directives.ts';
-import {
-  SchemaMetaFieldDef,
-  TypeMetaFieldDef,
-  TypeNameMetaFieldDef,
-} from '../type/introspection.ts';
 import type { GraphQLSchema } from '../type/schema.ts';
 import { typeFromAST } from './typeFromAST.ts';
 /**
@@ -86,34 +80,22 @@ export class TypeInfo {
     return 'TypeInfo';
   }
   getType(): Maybe<GraphQLOutputType> {
-    if (this._typeStack.length > 0) {
-      return this._typeStack[this._typeStack.length - 1];
-    }
+    return this._typeStack.at(-1);
   }
   getParentType(): Maybe<GraphQLCompositeType> {
-    if (this._parentTypeStack.length > 0) {
-      return this._parentTypeStack[this._parentTypeStack.length - 1];
-    }
+    return this._parentTypeStack.at(-1);
   }
   getInputType(): Maybe<GraphQLInputType> {
-    if (this._inputTypeStack.length > 0) {
-      return this._inputTypeStack[this._inputTypeStack.length - 1];
-    }
+    return this._inputTypeStack.at(-1);
   }
   getParentInputType(): Maybe<GraphQLInputType> {
-    if (this._inputTypeStack.length > 1) {
-      return this._inputTypeStack[this._inputTypeStack.length - 2];
-    }
+    return this._inputTypeStack.at(-2);
   }
   getFieldDef(): Maybe<GraphQLField<unknown, unknown>> {
-    if (this._fieldDefStack.length > 0) {
-      return this._fieldDefStack[this._fieldDefStack.length - 1];
-    }
+    return this._fieldDefStack.at(-1);
   }
   getDefaultValue(): Maybe<unknown> {
-    if (this._defaultValueStack.length > 0) {
-      return this._defaultValueStack[this._defaultValueStack.length - 1];
-    }
+    return this._defaultValueStack.at(-1);
   }
   getDirective(): Maybe<GraphQLDirective> {
     return this._directive;
@@ -209,7 +191,7 @@ export class TypeInfo {
         let inputField: GraphQLInputField | undefined;
         if (isInputObjectType(objectType)) {
           inputField = objectType.getFields()[node.name.value];
-          if (inputField) {
+          if (inputField != null) {
             inputFieldType = inputField.type;
           }
         }
@@ -274,35 +256,15 @@ export class TypeInfo {
 }
 type GetFieldDefFn = (
   schema: GraphQLSchema,
-  parentType: GraphQLType,
+  parentType: GraphQLCompositeType,
   fieldNode: FieldNode,
 ) => Maybe<GraphQLField<unknown, unknown>>;
-/**
- * Not exactly the same as the executor's definition of getFieldDef, in this
- * statically evaluated environment we do not always have an Object type,
- * and need to handle Interface and Union types.
- */
 function getFieldDef(
   schema: GraphQLSchema,
-  parentType: GraphQLType,
+  parentType: GraphQLCompositeType,
   fieldNode: FieldNode,
-): Maybe<GraphQLField<unknown, unknown>> {
-  const name = fieldNode.name.value;
-  if (
-    name === SchemaMetaFieldDef.name &&
-    schema.getQueryType() === parentType
-  ) {
-    return SchemaMetaFieldDef;
-  }
-  if (name === TypeMetaFieldDef.name && schema.getQueryType() === parentType) {
-    return TypeMetaFieldDef;
-  }
-  if (name === TypeNameMetaFieldDef.name && isCompositeType(parentType)) {
-    return TypeNameMetaFieldDef;
-  }
-  if (isObjectType(parentType) || isInterfaceType(parentType)) {
-    return parentType.getFields()[name];
-  }
+) {
+  return schema.getField(parentType, fieldNode.name.value);
 }
 /**
  * Creates a new visitor instance which maintains a provided TypeInfo instance

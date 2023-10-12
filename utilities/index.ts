@@ -26,8 +26,6 @@ export type {
 } from './getIntrospectionQuery.ts';
 // Gets the target Operation from a Document.
 export { getOperationAST } from './getOperationAST.ts';
-// Gets the Type for the target Operation AST.
-export { getOperationRootType } from './getOperationRootType.ts';
 // Convert a GraphQLSchema to an IntrospectionQuery.
 export { introspectionFromSchema } from './introspectionFromSchema.ts';
 // Build a GraphQLSchema from an introspection result.
@@ -43,6 +41,7 @@ export { lexicographicSortSchema } from './lexicographicSortSchema.ts';
 export {
   printSchema,
   printType,
+  printDirective,
   printIntrospectionSchema,
 } from './printSchema.ts';
 // Create a GraphQLType from a GraphQL language AST.
@@ -69,8 +68,6 @@ export {
   isTypeSubTypeOf,
   doTypesOverlap,
 } from './typeComparators.ts';
-// Asserts that a string is a valid GraphQL name
-export { assertValidName, isValidNameError } from './assertValidName.ts';
 // Compares two GraphQLSchemas and detects breaking changes.
 export {
   BreakingChangeType,

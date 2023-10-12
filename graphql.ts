@@ -1,4 +1,3 @@
-import { devAssert } from './jsutils/devAssert.ts';
 import { isPromise } from './jsutils/isPromise.ts';
 import type { Maybe } from './jsutils/Maybe.ts';
 import type { PromiseOrValue } from './jsutils/PromiseOrValue.ts';
@@ -11,8 +10,8 @@ import type {
 import type { GraphQLSchema } from './type/schema.ts';
 import { validateSchema } from './type/validate.ts';
 import { validate } from './validation/validate.ts';
-import type { ExecutionResult } from './execution/execute.ts';
 import { execute } from './execution/execute.ts';
+import type { ExecutionResult } from './execution/IncrementalPublisher.ts';
 /**
  * This is the primary entry point function for fulfilling GraphQL operations
  * by parsing, validating, and executing a GraphQL document along side a
@@ -21,6 +20,8 @@ import { execute } from './execution/execute.ts';
  * More sophisticated GraphQL servers, such as those which persist queries,
  * may wish to separate the validation and execution phases to a static time
  * tooling step, and a server runtime step.
+ *
+ * This function does not support incremental delivery (`@defer` and `@stream`).
  *
  * Accepts either an object with named arguments, or individual arguments:
  *
@@ -83,12 +84,6 @@ export function graphqlSync(args: GraphQLArgs): ExecutionResult {
   return result;
 }
 function graphqlImpl(args: GraphQLArgs): PromiseOrValue<ExecutionResult> {
-  // Temporary for v15 to v16 migration. Remove in v17
-  arguments.length < 2 ||
-    devAssert(
-      false,
-      'graphql@16 dropped long-deprecated support for positional arguments, please pass an object instead.',
-    );
   const {
     schema,
     source,
