@@ -1,33 +1,19 @@
-import { isObjectLike } from '../jsutils/isObjectLike.js';
-import { getLocation } from '../language/location.js';
-import {
-  printLocation,
-  printSourceLocation,
-} from '../language/printLocation.js';
-function toNormalizedOptions(args) {
-  const firstArg = args[0];
-  if (firstArg == null || 'kind' in firstArg || 'length' in firstArg) {
-    return {
-      nodes: firstArg,
-      source: args[1],
-      positions: args[2],
-      path: args[3],
-      originalError: args[4],
-      extensions: args[5],
-    };
-  }
-  return firstArg;
-}
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
+exports.GraphQLError = void 0;
+const isObjectLike_js_1 = require('../jsutils/isObjectLike.js');
+const location_js_1 = require('../language/location.js');
+const printLocation_js_1 = require('../language/printLocation.js');
 /**
  * A GraphQLError describes an Error found during the parse, validate, or
  * execute phases of performing a GraphQL operation. In addition to a message
  * and stack trace, it also includes information about the locations in a
  * GraphQL document and/or execution result that correspond to the Error.
  */
-export class GraphQLError extends Error {
-  constructor(message, ...rawArgs) {
+class GraphQLError extends Error {
+  constructor(message, options = {}) {
     const { nodes, source, positions, path, originalError, extensions } =
-      toNormalizedOptions(rawArgs);
+      options;
     super(message);
     this.name = 'GraphQLError';
     this.path = path ?? undefined;
@@ -44,9 +30,13 @@ export class GraphQLError extends Error {
     this.positions = positions ?? nodeLocations?.map((loc) => loc.start);
     this.locations =
       positions && source
-        ? positions.map((pos) => getLocation(source, pos))
-        : nodeLocations?.map((loc) => getLocation(loc.source, loc.start));
-    const originalExtensions = isObjectLike(originalError?.extensions)
+        ? positions.map((pos) => (0, location_js_1.getLocation)(source, pos))
+        : nodeLocations?.map((loc) =>
+            (0, location_js_1.getLocation)(loc.source, loc.start),
+          );
+    const originalExtensions = (0, isObjectLike_js_1.isObjectLike)(
+      originalError?.extensions,
+    )
       ? originalError?.extensions
       : undefined;
     this.extensions = extensions ?? originalExtensions ?? Object.create(null);
@@ -66,13 +56,13 @@ export class GraphQLError extends Error {
     // Include (non-enumerable) stack trace.
     /* c8 ignore start */
     // FIXME: https://github.com/graphql/graphql-js/issues/2317
-    if (originalError?.stack) {
+    if (originalError?.stack != null) {
       Object.defineProperty(this, 'stack', {
         value: originalError.stack,
         writable: true,
         configurable: true,
       });
-    } else if (Error.captureStackTrace) {
+    } else if (Error.captureStackTrace != null) {
       Error.captureStackTrace(this, GraphQLError);
     } else {
       Object.defineProperty(this, 'stack', {
@@ -91,12 +81,14 @@ export class GraphQLError extends Error {
     if (this.nodes) {
       for (const node of this.nodes) {
         if (node.loc) {
-          output += '\n\n' + printLocation(node.loc);
+          output += '\n\n' + (0, printLocation_js_1.printLocation)(node.loc);
         }
       }
     } else if (this.source && this.locations) {
       for (const location of this.locations) {
-        output += '\n\n' + printSourceLocation(this.source, location);
+        output +=
+          '\n\n' +
+          (0, printLocation_js_1.printSourceLocation)(this.source, location);
       }
     }
     return output;
@@ -117,24 +109,7 @@ export class GraphQLError extends Error {
     return formattedError;
   }
 }
+exports.GraphQLError = GraphQLError;
 function undefinedIfEmpty(array) {
   return array === undefined || array.length === 0 ? undefined : array;
-}
-/**
- * Prints a GraphQLError to a string, representing useful location information
- * about the error's position in the source.
- *
- * @deprecated Please use `error.toString` instead. Will be removed in v17
- */
-export function printError(error) {
-  return error.toString();
-}
-/**
- * Given a GraphQLError, format it according to the rules described by the
- * Response Format, Errors section of the GraphQL Specification.
- *
- * @deprecated Please use `error.toJSON` instead. Will be removed in v17
- */
-export function formatError(error) {
-  return error.toJSON();
 }
